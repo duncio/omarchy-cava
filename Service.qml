@@ -51,10 +51,10 @@ Item {
     id: installer
     command: root.script("install")
     stdout: StdioCollector {
-      onStreamFinished: console.log("omarchy-cava: install\n" + text)
+      onStreamFinished: if (text.trim().length > 0) console.log("omarchy-cava: install\n" + text)
     }
     stderr: StdioCollector {
-      onStreamFinished: console.warn("omarchy-cava: install\n" + text)
+      onStreamFinished: if (text.trim().length > 0) console.warn("omarchy-cava: install\n" + text)
     }
   }
 
@@ -73,7 +73,7 @@ Item {
       onStreamFinished: if (text.trim().length > 0) console.log("omarchy-cava: " + text)
     }
     stderr: StdioCollector {
-      onStreamFinished: console.warn("omarchy-cava: " + text)
+      onStreamFinished: if (text.trim().length > 0) console.warn("omarchy-cava: " + text)
     }
   }
 
