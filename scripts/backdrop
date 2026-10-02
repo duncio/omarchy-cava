@@ -102,10 +102,15 @@ start() {
 
   command=$(terminal_command "$name")
 
-  # setsid plus uwsm-app puts the window in its own scope, so it outlives the
-  # shell service that started it: the visualizer is not supposed to stop
-  # because the bar was restarted.
-  setsid uwsm-app -- sh -c "$command" >>"$log" 2>&1 &
+  # supervise ends the visualizer when the plugin is disabled, which is a thing
+  # that has to outlive the shell service that started it.
+  #
+  # setsid plus uwsm-app puts the whole thing in its own scope, so it outlives
+  # the shell service too: the visualizer is not supposed to stop because the bar
+  # was restarted.
+  #
+  # shell -c turns the command back into words, which supervise hands to exec.
+  setsid uwsm-app -- sh -c "$plugin_dir/scripts/supervise $command" >>"$log" 2>&1 &
 
   local waited=0
   while ((waited < 30)); do

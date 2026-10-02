@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+
+# Runs the visualizer, and stops it when the plugin stops being enabled.
+#
+# The shell destroys a plugin's service the moment it is disabled, and by then
+# nothing inside the shell can start a process any more, so a teardown handler in
+# the service cannot be relied on. The check that ends the visualizer therefore
+# lives next to the process it ends. It also has to stay quiet across a shell
+# restart, which destroys and recreates the service without the plugin ever
+# being disabled: the plugin is still in shell.json then, so nothing happens.
+#
+# The visualizer is the argument, already split into words by the caller.
+
+set -uo pipefail
+
+plugin_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+plugin_id=$(grep -o '"id"[[:space:]]*:[[:space:]]*"[^"]*"' "$plugin_dir/manifest.json" | head -1 | cut -d'"' -f4)
+shell_json="$HOME/.config/omarchy/shell.json"
+
+enabled() {
+  grep -qF "\"$plugin_id\"" "$shell_json" 2>/dev/null
+}
+
+if [[ -z $plugin_id ]]; then
+  echo "supervise: could not read the plugin id from $plugin_dir/manifest.json" >&2
+  exit 1
+fi
+
+"$@" &
+visualizer=$!
+
+# A slow poll on purpose: this is a safety net, not a hot loop. It also ends the
+# wait when the terminal exits on its own, so nothing is left behind to exit
+# later.
+while kill -0 "$visualizer" 2>/dev/null; do
+  sleep 15
+  enabled || break
+done
+
+if kill -0 "$visualizer" 2>/dev/null; then
+  "$plugin_dir/scripts/backdrop" stop
+fi
+
+wait "$visualizer" 2>/dev/null || true
