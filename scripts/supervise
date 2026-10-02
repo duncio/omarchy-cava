@@ -29,11 +29,11 @@ fi
 "$@" &
 visualizer=$!
 
-# A slow poll on purpose: this is a safety net, not a hot loop. It also ends the
-# wait when the terminal exits on its own, so nothing is left behind to exit
-# later.
+# One cheap check every few seconds: a "kill -0" and a grep of one small file.
+# That is also what decides how long the visualizer lingers after the plugin is
+# disabled, so it is short enough to be invisible and long enough to be free.
 while kill -0 "$visualizer" 2>/dev/null; do
-  sleep 15
+  sleep 5
   enabled || break
 done
 

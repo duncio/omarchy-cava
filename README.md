@@ -106,6 +106,10 @@ state directories, and the script itself lives in the plugin directory.
   because the workspace underneath them is still empty.
 - The visualizer is not restarted when the terminal is replaced underneath it; the
   service checks every 30 seconds and starts it again if it went away.
+- Disabling the plugin stops the visualizer within a few seconds, through a
+  supervisor process that watches `shell.json` rather than through the shell: a
+  plugin service is destroyed on disable, and by then the shell can no longer
+  start anything.
 
 ## License
 
