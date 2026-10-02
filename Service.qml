@@ -38,14 +38,16 @@ Item {
     watchdog.restart()
   }
 
-  // Nothing is torn down on a shell restart, only on a real disable: the window
-  // rule lives in the state directory and install-hyprd owns that file, so
-  // scripts/uninstall is the one place that removes it.
+  // There is deliberately no teardown here. Disabling a plugin destroys this
+  // service, and by then nothing inside the shell can start a process any more,
+  // so a handler on destruction gets to run at best and gets dropped at worst.
+  // scripts/supervise watches the plugin's own state next to the visualizer and
+  // ends it instead, which also keeps a visualizer that died on its own from
+  // being the shell's problem.
   //
-  // The stop runs detached on purpose. A Process object is a child of this one,
-  // so it is gone before it can spawn anything once the service is destroyed,
-  // which is exactly when this has to happen.
-  Component.onDestruction: Util.execDetached(root.script("backdrop", ["stop"]))
+  // The window rule outlives the plugin for the same reason. It matches a window
+  // class nothing uses any more, and scripts/uninstall is the one place that
+  // removes it.
 
   // ---------------------------------------------------------------- processes
 
