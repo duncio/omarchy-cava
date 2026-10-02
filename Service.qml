@@ -38,10 +38,14 @@ Item {
     watchdog.restart()
   }
 
-  // Nothing is torn down here on a shell restart, only on a real disable: the
-  // window rule lives in the state directory and install-hyprd owns that file,
-  // so scripts/uninstall is the one place that removes it.
-  Component.onDestruction: stopper.running = true
+  // Nothing is torn down on a shell restart, only on a real disable: the window
+  // rule lives in the state directory and install-hyprd owns that file, so
+  // scripts/uninstall is the one place that removes it.
+  //
+  // The stop runs detached on purpose. A Process object is a child of this one,
+  // so it is gone before it can spawn anything once the service is destroyed,
+  // which is exactly when this has to happen.
+  Component.onDestruction: Util.execDetached(root.script("backdrop", ["stop"]))
 
   // ---------------------------------------------------------------- processes
 
@@ -75,11 +79,6 @@ Item {
     stderr: StdioCollector {
       onStreamFinished: if (text.trim().length > 0) console.warn("omarchy-cava: " + text)
     }
-  }
-
-  Process {
-    id: stopper
-    command: root.script("backdrop", ["stop"])
   }
 
   // Cheap liveness check: install is a no-op when the window is already there.
