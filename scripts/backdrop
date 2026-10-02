@@ -137,10 +137,15 @@ stop() {
   fi
 
   # The terminal is gone, so any cava it started is on its way out too. This is
-  # only a safety net for a terminal that left the process behind, and matching
-  # on the plugin's own config path keeps it away from any cava the user is
-  # running themselves.
-  pkill -f "$plugin_dir/cava/config" >/dev/null 2>&1 || true
+  # only a safety net for a terminal that left the process behind, and it has to
+  # be narrow twice over: a process named exactly "cava", carrying this plugin's
+  # config path, so it cannot reach a cava the user is running themselves.
+  local pid
+  for pid in $(pgrep -x cava 2>/dev/null); do
+    if tr '\0' ' ' <"/proc/$pid/cmdline" 2>/dev/null | grep -qF "$plugin_dir/cava/config"; then
+      kill "$pid" 2>/dev/null || true
+    fi
+  done
 }
 
 case "${1:-}" in

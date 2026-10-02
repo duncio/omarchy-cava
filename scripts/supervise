@@ -9,13 +9,19 @@
 # restart, which destroys and recreates the service without the plugin ever
 # being disabled: the plugin is still in shell.json then, so nothing happens.
 #
-# The visualizer is the argument, already split into words by the caller.
+# Everything the cleanup needs is captured here, before the plugin directory can
+# disappear. `omarchy plugin remove` deletes that directory, which is exactly the
+# moment this runs, so calling back into it would leave the visualizer running
+# with nothing left to stop it. That is why the two lines of teardown below are
+# inline rather than a call to scripts/backdrop.
 
 set -uo pipefail
 
 plugin_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 plugin_id=$(grep -o '"id"[[:space:]]*:[[:space:]]*"[^"]*"' "$plugin_dir/manifest.json" | head -1 | cut -d'"' -f4)
+cava_config="$plugin_dir/cava/config"
 shell_json="$HOME/.config/omarchy/shell.json"
+rule="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/toggles/hypr/omarchy-cava.lua"
 
 enabled() {
   grep -qF "\"$plugin_id\"" "$shell_json" 2>/dev/null
@@ -32,13 +38,36 @@ visualizer=$!
 # One cheap check every few seconds: a "kill -0" and a grep of one small file.
 # That is also what decides how long the visualizer lingers after the plugin is
 # disabled, so it is short enough to be invisible and long enough to be free.
+# It ends the wait when the terminal exits on its own, too, so nothing is left
+# behind to exit later.
 while kill -0 "$visualizer" 2>/dev/null; do
   sleep 5
   enabled || break
 done
 
-if kill -0 "$visualizer" 2>/dev/null; then
-  "$plugin_dir/scripts/backdrop" stop
+# Only the plugin going away is worth undoing. A terminal that died on its own
+# leaves the window rule alone, because the plugin is still installed and its
+# service is about to install that rule again and restart the visualizer.
+if ! enabled && kill -0 "$visualizer" 2>/dev/null; then
+  hyprctl dispatch "hl.dsp.window.close({ window = \"class:^(omarchy-cava)\$\" })" >/dev/null 2>&1 || true
+fi
+
+# With the terminal gone, cava is on its way out too. Only a process named
+# exactly "cava" qualifies, and it has to be carrying this plugin's config path:
+# that keeps it from matching this supervisor, whose own arguments mention the
+# same path, and from killing any cava the user is running themselves.
+for pid in $(pgrep -x cava 2>/dev/null); do
+  if tr '\0' ' ' <"/proc/$pid/cmdline" 2>/dev/null | grep -qF "$cava_config"; then
+    kill "$pid" 2>/dev/null || true
+  fi
+done
+
+# The rule outlives a shell restart on purpose, and only goes when the plugin is
+# no longer enabled, so disabling or removing it does not leave a window rule
+# behind for a window nothing opens any more.
+if ! enabled; then
+  rm -f "$rule"
+  hyprctl reload >/dev/null 2>&1 || true
 fi
 
 wait "$visualizer" 2>/dev/null || true

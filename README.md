@@ -84,12 +84,19 @@ makes no network requests.
 ## Removal
 
 ```sh
-~/.config/omarchy/plugins/io.github.duncio.omarchy-cava/scripts/uninstall
 omarchy plugin remove io.github.duncio.omarchy-cava
 ```
 
-Run the first command before the second: it stops the visualizer and deletes both
-state directories, and the script itself lives in the plugin directory.
+That is enough: the supervisor process notices within a few seconds, stops the
+visualizer and removes the window rule, so nothing of the plugin is left running
+or loaded.
+
+To also delete the small state directory it keeps its generated colors and a log
+in, run this first, while the plugin directory still exists:
+
+```sh
+~/.config/omarchy/plugins/io.github.duncio.omarchy-cava/scripts/uninstall
+```
 
 ## Notes and limits
 
