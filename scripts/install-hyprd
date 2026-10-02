@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+
+# Install the Hyprland half of the plugin.
+#
+# Omarchy loads every *.lua file in ~/.local/state/omarchy/toggles/hypr on each
+# config load, which is the supported way to add Hyprland code without asking the
+# user to edit their own hyprland.lua. The file is only copied when it differs
+# from what is already there, so a reinstall while the desktop is running does
+# not reload Hyprland for nothing.
+
+set -euo pipefail
+
+plugin_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+toggles_dir="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/toggles/hypr"
+installed="$toggles_dir/omarchy-cava.lua"
+
+mkdir -p "$toggles_dir"
+
+if [[ -f $installed ]] && cmp -s "$plugin_dir/hypr/omarchy-cava.lua" "$installed"; then
+  exit 0
+fi
+
+install -m 644 "$plugin_dir/hypr/omarchy-cava.lua" "$installed"
+
+# Pick the new rule up. Hyprland reloads on its own when the file changes, but the
+# copy happens through install(1) rather than an editor's atomic rename, so ask
+# for it explicitly and wait for the reload to finish before starting the window.
+hyprctl reload >/dev/null 2>&1 || true
+sleep 0.5

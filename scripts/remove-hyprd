@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+# Remove the Hyprland half of the plugin. Run scripts/uninstall instead of this
+# when removing the plugin: that also stops the visualizer.
+
+set -euo pipefail
+
+toggles_dir="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/toggles/hypr"
+installed="$toggles_dir/omarchy-cava.lua"
+
+[[ -f $installed ]] || exit 0
+
+rm -f "$installed"
+hyprctl reload >/dev/null 2>&1 || true
+sleep 0.5

@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+
+# Undo everything this plugin does to the machine. Run this before
+# `omarchy plugin remove`, because afterwards the scripts are gone with it.
+#
+# What it cleans up:
+#   ~/.local/state/omarchy/toggles/hypr/omarchy-cava.lua   the window rule
+#   ~/.local/state/omarchy-cava/                           colors and logs
+#   the visualizer window and its process
+#
+# Nothing outside those two directories is touched: the plugin never writes to
+# ~/.config, and never edits the user's Hyprland, terminal or cava configuration.
+
+set -euo pipefail
+
+plugin_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy-cava"
+
+"$plugin_dir/scripts/backdrop" stop || true
+"$plugin_dir/scripts/remove-hyprd" || true
+
+rm -rf "$state_dir"

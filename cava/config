@@ -1,0 +1,39 @@
+# Cava, drawn along the bottom of an empty workspace.
+#
+# The plugin (Service.qml) runs this in a transparent terminal window and moves
+# that window in and out of view as windows come and go, so only the sections
+# below matter here: the window and the colors are the plugin's business.
+#
+# The colors come from the file named by `theme`. Cava looks for it under
+# $XDG_CONFIG_HOME/cava/themes, and scripts/backdrop points XDG_CONFIG_HOME at the
+# plugin's own state directory so nothing is written to the user's ~/.config.
+# scripts/write-colors renders that file from the current Omarchy theme, and the
+# visualizer is restarted when the theme changes, because cava reads colors when
+# it starts.
+
+[general]
+framerate = 60
+sens_multiplier = 1.0
+noise_reduction = 0.2
+autoblock = 1
+
+[input]
+method = pulse
+source = auto
+sample_rate = 44100
+fft_size = 4096
+fft_gain = 1.0
+smoothing = 0.8
+buffer = 0.2
+
+[output]
+# Thin bars with a gap between them: across the full width of the screen that
+# reads as one waveform rather than a row of separate ones.
+mode = bars
+bar_width = 1
+bar_spacing = 2
+autosmooth = true
+max_fps = 60
+
+[color]
+theme = 'omarchy'

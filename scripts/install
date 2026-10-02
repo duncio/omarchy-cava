@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+# Put everything in place and start the visualizer. Safe to run repeatedly: the
+# Hyprland rule is only copied when it changed, the colors are only rewritten
+# when the theme changed, and the visualizer is only started when it is not
+# already running.
+
+set -euo pipefail
+
+plugin_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+
+"$plugin_dir/scripts/install-hyprd"
+"$plugin_dir/scripts/write-colors" || true
+"$plugin_dir/scripts/backdrop" start

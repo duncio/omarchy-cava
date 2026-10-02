@@ -1,0 +1,4 @@
+# Nothing generated belongs in the repository: the colors and the log are
+# written to ~/.local/state/omarchy-cava at runtime.
+
+*.log

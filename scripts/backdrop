@@ -1,0 +1,160 @@
+#!/usr/bin/env bash
+
+# The visualizer process: start it, stop it, or report on it.
+#
+# Cava is an ncurses TUI, so it needs a terminal. Any of the terminals Omarchy
+# ships can host it, but each needs its own way of saying three things: this is
+# the window class, this is the size in cells, and the background is fully
+# transparent with no padding. The visualizer is launched straight into the
+# hidden workspace (hypr/omarchy-cava.lua), so it is placed while it is invisible
+# and nothing flickers on the way in.
+#
+# Environment overrides, for people who want a different terminal, a taller band
+# or a different gap between bars:
+#   OMARCHY_CAVA_TERMINAL  foot | ghostty | alacritty | kitty
+#   OMARCHY_CAVA_ROWS      height of the band in terminal rows (default 16)
+#   OMARCHY_CAVA_COLUMNS   width of the band in terminal columns (default 400,
+#                          far more than a screen needs: the window rule sets the
+#                          real width)
+
+set -euo pipefail
+
+plugin_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy-cava"
+log="$state_dir/backdrop.log"
+
+class="omarchy-cava"
+rows="${OMARCHY_CAVA_ROWS:-16}"
+columns="${OMARCHY_CAVA_COLUMNS:-400}"
+
+mkdir -p "$state_dir"
+
+running() {
+  hyprctl clients 2>/dev/null | grep -q "^	class: $class$"
+}
+
+# Cava finds its theme file under $XDG_CONFIG_HOME, so pointing that at the
+# plugin's state directory keeps the generated colors out of ~/.config/cava.
+cava_command() {
+  printf '%s' "env XDG_CONFIG_HOME=$state_dir/xdg cava -p $plugin_dir/cava/config"
+}
+
+# Each terminal gets the same three answers, in its own words: the app id, a size
+# in cells, and a transparent, unpadded window. Defaults are only overridden
+# where they would otherwise show: the visualizer is scenery, not a shell.
+terminal_command() {
+  case "$1" in
+    foot)
+      # -W is cells, -o overrides a single config key.
+      printf 'foot --app-id=%s --title=%s -W %sx%s -o colors-dark.alpha=0 -o pad=0x0 -- %s' \
+        "$class" "$class" "$columns" "$rows" "$(cava_command)"
+      ;;
+    ghostty)
+      # Every config key is a CLI flag; window sizes are cells and cannot be pixels.
+      # background-opacity-cells matters: without it a TUI that paints its own
+      # cell backgrounds stays opaque.
+      printf 'ghostty --class=%s --title=%s --window-width=%s --window-height=%s --background-opacity=0 --background-opacity-cells=true --window-padding-x=0 --window-padding-y=0 -- %s' \
+        "$class" "$class" "$columns" "$rows" "$(cava_command)"
+      ;;
+    alacritty)
+      # No CLI size flag and no alpha in colors: the size is a config override in
+      # cells, and transparency is the window opacity.
+      printf 'alacritty --class %s --title %s -o window.dimensions.columns=%s -o window.dimensions.lines=%s -o window.opacity=0 -o colors.transparent_background_colors=true -o window.padding.x=0 -o window.padding.y=0 -e %s' \
+        "$class" "$class" "$columns" "$rows" "$(cava_command)"
+      ;;
+    kitty)
+      # remember_window_size wins over initial_window_*, so it has to go. The c
+      # suffix on the sizes is what makes them cells instead of pixels.
+      printf 'kitty --class %s --title %s -o remember_window_size=no -o initial_window_width=%sc -o initial_window_height=%sc -o background_opacity=0 -o transparent_background_colors=yes -o window_margin_width=0 -o window_padding_width=0 -- %s' \
+        "$class" "$class" "$columns" "$rows" "$(cava_command)"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+terminal() {
+  local candidate
+
+  for candidate in "${OMARCHY_CAVA_TERMINAL:-}" "$(omarchy-default-terminal 2>/dev/null || true)" foot ghostty alacritty kitty; do
+    [[ -n $candidate ]] || continue
+    command -v "$candidate" >/dev/null 2>&1 || continue
+    terminal_command "$candidate" >/dev/null 2>&1 && {
+      printf '%s' "$candidate"
+      return 0
+    }
+  done
+
+  return 1
+}
+
+start() {
+  if running; then
+    return 0
+  fi
+
+  local name command
+  if ! name=$(terminal); then
+    echo "backdrop: no supported terminal found (tried \$OMARCHY_CAVA_TERMINAL, omarchy-default-terminal, foot, ghostty, alacritty, kitty)" >&2
+    return 1
+  fi
+
+  command=$(terminal_command "$name")
+
+  # setsid plus uwsm-app puts the window in its own scope, so it outlives the
+  # shell service that started it: the visualizer is not supposed to stop
+  # because the bar was restarted.
+  setsid uwsm-app -- sh -c "$command" >>"$log" 2>&1 &
+
+  local waited=0
+  while ((waited < 30)); do
+    if running; then
+      return 0
+    fi
+    sleep 0.1
+    ((waited++))
+  done
+
+  echo "backdrop: the visualizer window never appeared; see $log" >&2
+  return 1
+}
+
+stop() {
+  if running; then
+    hyprctl dispatch "hl.dsp.window.close({ window = \"class:^($class)\$\" })" >/dev/null 2>&1 || true
+
+    local waited=0
+    while ((waited < 20)) && running; do
+      sleep 0.1
+      ((waited++))
+    done
+  fi
+
+  # The terminal is gone, so any cava it started is on its way out too. This is
+  # only a safety net for a terminal that left the process behind, and matching
+  # on the plugin's own config path keeps it away from any cava the user is
+  # running themselves.
+  pkill -f "$plugin_dir/cava/config" >/dev/null 2>&1 || true
+}
+
+case "${1:-}" in
+  start) start ;;
+  stop) stop ;;
+  restart)
+    stop
+    start
+    ;;
+  status)
+    if running; then
+      echo "running"
+    else
+      echo "stopped"
+      exit 1
+    fi
+    ;;
+  *)
+    echo "Usage: backdrop start|stop|restart|status" >&2
+    exit 2
+    ;;
+esac

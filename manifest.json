@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.duncio.omarchy-cava",
+  "name": "Omarchy Cava",
+  "version": "1.0.0",
+  "author": "Rafal Kordowski",
+  "license": "MIT",
+  "homepage": "https://github.com/duncio/omarchy-cava",
+  "description": "Cava as a desktop backdrop: a band of themed audio bars across the bottom of an empty workspace, hidden the moment any window opens.",
+  "kinds": [
+    "service"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "Service.qml"
+  }
+}
