@@ -8,7 +8,8 @@
 -- running, so the bars come back the moment a workspace empties again.
 
 local CLASS = "omarchy-cava" -- the terminal is launched with this app id
-local HIDDEN = "special:omarchy-cava"
+local HIDING_PLACE = "omarchy-cava" -- the special workspace the window waits in
+local HIDDEN = "special:" .. HIDING_PLACE
 
 hl.window_rule({
   match = { class = "^" .. CLASS .. "$" },
@@ -95,12 +96,30 @@ for _, window in ipairs(hl.get_windows()) do
   end
 end
 
+-- Hyprland dims the whole screen while a special workspace is open, which
+-- Omarchy's scratchpad console turns on (decoration.dim_special). Parking the
+-- backdrop opens its hiding place: a window moved into a special workspace from
+-- a window rule opens that workspace, and nothing closes it again, so a session
+-- that starts with the backdrop hidden comes up dimmed until something switches
+-- workspaces. Closing the workspace is enough, and it leaves the window parked
+-- on it: a window on a closed special workspace stays hidden and can be moved
+-- back out of it.
+local function close_hiding_place()
+  local special = hl.get_active_special_workspace()
+
+  if special and special.name == HIDDEN then
+    hl.dispatch(hl.dsp.workspace.toggle_special(HIDING_PLACE))
+  end
+end
+
 -- A backdrop belongs to the workspace in front and to nothing else, so an empty
 -- one shows it and any other window at all takes the screen back. Where it
 -- already is decides whether anything has to move: two empty workspaces in a row
 -- have to hand it over, not leave it behind on the one it came from.
 local function place()
   local active = hl.get_active_workspace()
+
+  close_hiding_place()
 
   if not active then
     return
@@ -126,6 +145,10 @@ local function sync()
 
   place()
 end
+
+-- A reload runs this file again, and a reload does not close an open special
+-- workspace either, so the dim is dealt with here as well as on every event.
+close_hiding_place()
 
 hl.on("window.open", function(window)
   if window.class == CLASS then
